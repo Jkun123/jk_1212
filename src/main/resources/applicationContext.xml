@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context" 
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"  
+	xmlns:jee="http://www.springframework.org/schema/jee" 
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop" 
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.1.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.1.xsd
+		http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.1.xsd
+		http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.1.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.1.xsd
+		http://www.springframework.org/schema/data/jpa http://www.springframework.org/schema/data/jpa/spring-jpa-1.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.1.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.1.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.1.xsd">
+	
+	<!-- Handler  配置了这个Spring就指定我们启动注解驱动   -->
+	<mvc:annotation-driven/>
+	
+	<!-- 然后通过下面标签的配置，会自动为我们扫描@Service、
+	@Controller、@Repository 等注解标记的组件注册到工厂中，来处理我们的请求 -->
+	<!-- 组件扫描 -->
+	<context:component-scan base-package="com.jk"></context:component-scan>
+	
+	<!-- 指定spring读取db.properties配置 -->
+	<context:property-placeholder location="classpath:db.properties"/>
+	
+
+	<!-- spring 拦截器 -->
+	<!-- <mvc:interceptors>
+		<mvc:interceptor>
+			拦截所有的请求
+			<mvc:mapping path="/**"/>
+			<bean class="com.bw.interceptor.HttpInterceptors"></bean>
+		</mvc:interceptor>
+	</mvc:interceptors> -->
+	
+	
+	<!-- 上传解析器 name必须是multipartResolver
+			 maxUploadSize 以B为单位
+		 	enctype="multipart/form-data"
+		 -->
+		<bean name="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+			<property name="defaultEncoding" value="utf-8"></property>
+			<property name="maxUploadSize" value="100000000"></property>
+		</bean>
+
+	<!-- 视图解析器 -->
+	<!-- prefix + 服务器方法返回值 + suffix -->
+	<bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="prefix" value="/"></property>
+		<property name="suffix" value=".jsp"></property>
+	</bean>
+	
+
+	<!-- 配置数据源 -->
+	<!-- 第一种方式  org.apache.commons.dbcp.BasicDataSource -->
+	<!-- 第二种方式  com.mchange.v2.c3p0.ComboPooledDataSource-->
+	<!-- <bean id="c3p0" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+		<property name="driverClass" value="${mysql.driver}"></property>
+		<property name="jdbcUrl"  value="${mysql.url}"></property>
+		<property name="user"  value="${mysql.username}"></property>
+		<property name="password"  value="${mysql.password}"></property>
+	</bean> -->
+	<bean id="dbcp" class="org.apache.commons.dbcp.BasicDataSource">
+		<property name="driverClassName" value="${mysql.driver}"></property>
+		<property name="url"  value="${mysql.url}"></property>
+		<property name="username"  value="${mysql.username}"></property>
+		<property name="password"  value="${mysql.password}"></property>
+	</bean>
+
+
+
+	<!-- 往上属于Spring MVC配置 -->
+	
+	<!-- 往下是Spring整合MyBatis配置 -->
+	
+	
+	<!-- SqlSessionFactoryBean
+		创建SqlSessionFactory对象，为整合应用提供SqlSession对象资源
+	MapperScannerConfigurer
+		根据指定包批量扫描Mapper接口并生成实例 -->
+	<bean id="factory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!-- 注入数据源 -->
+		<property name="dataSource" ref="dbcp"></property>
+	
+		<!-- 第一种方式： 加载mybatis主配置文件 -->
+		<!-- 需要在mybatis中加入分页插件比较方便 -->
+		<!-- <property name="configLocation" value="classpath:sqlmap-config.xml"></property> -->
+		
+		<!-- <property name="typeAliasesPackage" value="com.bw.pojo"></property>	 -->	
+		<!-- 配置mapper扫描文件的扫描位置 -->
+		<property name="mapperLocations">
+			<value>classpath:mapper/*.xml</value>
+		</property>
+		<!-- 分页插件 -->
+		<property name="plugins">
+			<array>
+				<bean class="com.github.pagehelper.PageHelper">
+					<property name="properties">
+						<value>
+							dialect=mysql
+							reasonable=true
+						</value>
+					</property>
+				</bean>
+			</array>
+		</property>
+	</bean>
+		
+		
+		
+	
+	<!-- 创建mapper扫描器 -->
+	<bean class=" org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<!-- 注入sqlsession -->
+		<property name="basePackage" value="com.jk.mapper"></property>
+		<!-- 
+		在mybatis-spring1.1.0以前，是通过<property name="sqlSessionFactory" ref="sqlSessionFactory"/>
+		将SqlSessionFactory对象注入到sqlSessionFactory，这样做可能会有一个问题，就是在初始化MyBatis时，
+		jdbc.properties文件还没被加载进来，dataSource的属性值没有被替换，就开始构造sqlSessionFactory类，
+		属性值就会加载失败。在1.1.0以后，MapperScannerConfigure提供了String类型的sqlSessionFactoryBeanName，
+		这样将bean name注入到sqlSessionFactoryBeanName，这样就会等到spring初始化完成后，再构建sqlSessionFactory。
+	 -->
+		<!-- <property name="sqlSessionFactory" ref="factory"></property> -->
+		
+		<property name="sqlSessionFactoryBeanName" value="factory"></property>
+		
+	</bean>
+	
+
+	<!-- 配置MyBatis的事务管理器，因为MyBatis底层用的是JDBC事务管理器，所以在这里依然配置JDBC事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dbcp"></property>
+	</bean>
+
+	<!-- 声明式事务管理 -->
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+
+	<!-- 事务通知 -->
+	<!-- 事务切入AOP -->
+	<!-- 配置事务管理器 -->
+  <!--   <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    	<property name="dataSource" ref="c3p0"></property>
+    </bean>
+    
+    事务处理
+    <aop:config>
+ 	   声明切入点
+    	<aop:pointcut expression="execution(* cn.com.bw.service..*.*(..))" id="serviceMethod"/>
+    	通知与切入点关联
+    	<aop:advisor advice-ref="trAdvice" pointcut-ref="serviceMethod"/>
+    </aop:config>
+    
+    <tx:advice id="trAdvice" transaction-manager="transactionManager">
+    	<tx:attributes>
+    		propagation事务的传播行为 isolation 事物的隔离级别
+    		REQUIRED 支持当前事务，如果当前没有事务，就新建一个事务
+    		<tx:method name="" read-only="false" propagation="REQUIRED"/>
+    	</tx:attributes>
+    </tx:advice> -->
+    
+</beans>
